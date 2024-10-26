@@ -1,0 +1,7 @@
+NbParticipant 55 952
+NbForm 41 753
+Q1C1 not null 26 743 (64%)
+Q1C1 len>5 25 779 (52%)
+Q1C1+NbEmpathy>0 14 257 (34%)
+Q1C1+NbEmpathy+5 char 3 807 (9%)
+Q1C*+NbEmpathy+40 char 5 810 (14%)

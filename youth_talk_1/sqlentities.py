@@ -1,3 +1,5 @@
+import datetime
+
 from sqlalchemy import Column, ForeignKey, Boolean, UniqueConstraint, Table, Index, DateTime
 from sqlalchemy.types import BigInteger, Integer, String, Float, Date, SmallInteger
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -34,6 +36,12 @@ class Topic(Base):
     source = Column(String(5), nullable=False, index=True)
     date = Column(DateTime, nullable=False)
 
+    def __init__(self, label=None, source=None, lemas=[]):
+        self.label = label
+        self.source = source
+        self.lemas = lemas
+        self.date = datetime.datetime.now()
+
     def __repr__(self):
         return f"{self.label} {self.count} {self.lemas}"
 
@@ -64,15 +72,28 @@ class Lema(Base):
 
     id = Column(BigInteger, primary_key=True)
     label = Column(String(), nullable=False)
+    count = Column(Integer, nullable=False)
     topic_id = Column(ForeignKey('topic.id'), nullable=False)
     topic: Mapped[Topic] = relationship(back_populates="lemas")
-    previous = Column(String())  # PAs grave si mappé
+    previous = Column(String())
+    pre_previous = Column(String())
+    date = Column(DateTime, nullable=False)
+
+    def __init__(self, label=None, previous=None, pre_previous=None):
+        self.label = label
+        self.previous = previous
+        self.pre_previous = pre_previous
+        self.count = 0
+        self.date = datetime.datetime.now()
 
     def __repr__(self):
-        return f"{self.label}"
+        return f"{self.label} {self.count}"
 
     def __eq__(self, other):
         return self.label == other.label
+
+    def __hash__(self):
+        return self.label.__hash__()
 
 
 class Stat(Base):

@@ -19,7 +19,7 @@ class NLTKModel:
         self.nlp = spacy.load("en_core_web_sm")
         self.nlp.add_pipe("textrank")
 
-    def textrank(self, text: str):
+    def textrank(self, text: str) -> list[tuple[str, int]]:
         doc = self.nlp(text)
         return [(phrase.text, phrase.count) for phrase in doc._.phrases]
 
@@ -33,6 +33,8 @@ class NLTKModel:
             return None, 0
         max = 0
         res = None
+        if s == "mariage":
+            pass
         for item in words:
             if item != "":
                 if s == item:
@@ -60,27 +62,10 @@ class NLTKModel:
         self.synonym_dico[word] = synonyms
         return synonyms
 
-    def nb_words(self, s: str) -> int:
-        return 0 if s is None or len(s) == 0 else s.count(" ") + 1
-
-    def sort_words(self, lemas: list[Lema]) -> list[Lema]:
-        lemas = list(lemas)
-        lemas.sort(key=lambda lema: len(lema.label))
-        lemas.reverse()
-        return lemas
-
-
     def strip_accents(self, s: str):
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
-    def remove_suffix(self, s: str):
-        if s.endswith("ed"):
-            return s[:-2]
-        if s.endswith("ing"):
-            return s[:-3]
-        return s
-
-    def normalize(self, s: str): # A porter dans lema
+    def normalize(self, s: str):  # A porter dans lema
         s = s.lower()
         s = self.strip_accents(s)
         # s = self.remove_suffix(s)
@@ -109,28 +94,16 @@ class NLTKModel:
         words = s.split(" ")
         res = []
         previous = None
+        pre_previous = None
         for word in words:
-            lema = Lema()
-            lema.label, lema.previous = word, previous
-            res.append(lema)
-            previous = word
+            word = word.strip()
+            if len(word) > 0:
+                lema = Lema(word, previous, pre_previous)
+                # lema.label, lema.previous, lema.pre_previous = word, previous, pre_previous
+                res.append(lema)
+                pre_previous = previous
+                previous = word
         return res
-    #
-    # def split_2_words(self, s: str) -> list[str]:
-    #     previous: str | None = None
-    #     words = self.split_words(s)
-    #     pairs: list[str] = []
-    #     for w in words:
-    #         if w is not None and len(w) >= self.min_length and not self.is_link_word(w):
-    #             if previous is not None:
-    #                 pairs.append(f"{previous}_{w}")
-    #             previous = w
-    #         else:
-    #             previous = None
-    #     return pairs
-
-    # def remove_short_words(self, words: list[str]) -> list[str]:
-    #     return [w for w in words if len(w) >= self.min_length]
 
     def is_short(self, word: str) -> bool:
         if word == "war":
@@ -142,6 +115,8 @@ class NLTKModel:
         for lema in res:
             if lema.previous is not None and self.is_short(lema.previous):
                 lema.previous = None
+            if lema.pre_previous is not None and self.is_short(lema.pre_previous):
+                lema.pre_previous = None
         return res
 
     def is_link_word(self, s: str) -> bool:
@@ -149,22 +124,36 @@ class NLTKModel:
             return True
         if s.isnumeric():
             return True
-        links = ["with", "which", "when", "under", "upper", "ever", "never", "less", "more"]
+        links = ["with", "which", "when", "under", "upper", "ever", "never", "less", "more", "true", "false"]
         return s in links
 
     def remove_link_lemas(self, lemas: list[Lema]) -> list[Lema]:
         res = [lema for lema in lemas if not (self.is_link_word(lema.label))]
-        for lema in res:
-            if lema.previous is not None and self.is_link_word(lema.previous):
-                lema.previous = None
+        # for lema in res:
+        #     if lema.previous is not None and self.is_link_word(lema.previous):
+        #         lema.previous = None
+        #     if lema.pre_previous is not None and self.is_link_word(lema.pre_previous):
+        #         lema.pre_previous = None
         return res
 
     def get_sub_word47(self, word: str, lemas: list[Lema]) -> Lema | None:
         t = 4 / 7
         if word == "" or word is None:
             return None
+        if word == "mariage":
+            pass
         for lema in lemas:
-            if word.startswith(lema.label):  # or lema.label.endswith(word):
+            w1 = word
+            if w1.endswith("ing"):
+                w1 = w1[:-3]
+            elif w1.endswith("ed"):
+                w1 = w1[:2]
+            w2 = lema.label
+            if w2.endswith("ing"):
+                w2 = w2[:-3]
+            elif w2.endswith("ed"):
+                w2 = w2[:2]
+            if (w1.startswith(w2) or w2.startswith(w1)) and len(w1) / len(w2) > t:
                 return lema
         return None
 
@@ -187,31 +176,23 @@ class NLTKModel:
         return None
 
     def group_sub_word47(self):
-        # for word in list(self.topics.keys()):
-        #     if word in self.topics:
-        #         topics = [topic for topic in self.topics.values() if topic.label != word]
-        #         for topic in topics:
-        #             lema = self.get_sub_word47(word, topic.lemas)
-        #             if lema is not None:
-        #                 self.topics[lema.label].count += self.topics[word].count
-        #                 for lema2 in self.topics[word].lemas:
-        #                     if lema2 not in self.topics[lema.label].lemas:
-        #                         self.topics[lema.label].lemas.append(lema2)
-        #                 del self.topics[word]
         self.group_generic(self.get_sub_word47)
 
     def group_generic(self, group_fn):
-        for word in list(self.topics.keys()):
+        cloned = dict(self.topics)
+        for word in cloned.keys():
             if word in self.topics:
                 topics = [topic for topic in self.topics.values() if topic.label != word]
                 for topic in topics:
+                    if word == "mariage":
+                        pass
                     lema = group_fn(word, topic.lemas)
                     if lema is not None:
-                        self.topics[word].count += self.topics[lema.label].count
-                        for lema2 in list(self.topics[lema.label].lemas):
+                        self.topics[word].count += self.topics[topic.label].count
+                        for lema2 in list(self.topics[topic.label].lemas):
                             if lema2 not in self.topics[word].lemas:
                                 self.topics[word].lemas.append(lema2)
-                        del self.topics[lema.label]
+                        del self.topics[topic.label]
 
     def group_synonyms(self):
         self.group_generic(self.get_synonym)
@@ -219,34 +200,41 @@ class NLTKModel:
     def group_gestalts(self):
         self.group_generic(self.get_gestalt)
 
+    # Utiliser tokenize_textrank à la place
     def tokenize(self, text: str) -> list[list[Lema]]:
         text = self.normalize(text)
         phrases = self.split_phrases(text)
         lemass = [self.split_lemas(p) for p in phrases]
+        return self.tokenize_lemass(lemass)
+
+    def tokenize_lemass(self, lemass: list[list[Lema]]) -> list[list[Lema]]:
         lemass = [self.remove_short_lemas(lemas) for lemas in lemass]
         lemass = [self.remove_link_lemas(lemas) for lemas in lemass]
         lemass = [lemas for lemas in lemass if len(lemas) > 0]
         return lemass
 
-    def count(self, phrases: list[list[Lema]]) -> dict[str, tuple[Lema, int]]:
-        dico: dict[str, tuple[Lema, int]] = {}
+    def tokenize_textrank(self, text: str, limit=3) -> list[list[Lema]]:
+        text = self.normalize(text)
+        phrases = self.textrank(text)
+        lemass = [self.split_lemas(p[0]) * p[1] for p in phrases[:limit]]
+        lemass = self.tokenize_lemass(lemass)
+        return lemass
+
+    def count(self, phrases: list[list[Lema]]) -> dict[str, Lema]:
+        dico: dict[str, Lema] = {}
         for phrase in phrases:
             for lema in phrase:
                 if lema.label not in dico:
-                    dico[lema.label] = lema, 0
-                dico[lema.label] = lema, dico[lema.label][1] + 1
+                    dico[lema.label] = lema
+                dico[lema.label].count += 1
         return dico
 
-    def grouping(self, dico: dict[str, tuple[Lema, int]]):
+    def grouping(self, dico: dict[str, Lema]):
         for key in dico.keys():
             if key not in self.topics:
-                topic = Topic()
-                topic.label = key
-                topic.count = dico[key][1]
-                topic.lemas = [dico[key][0]]
-                topic.source = "NLTK"
-                topic.date = datetime.datetime.now()
+                topic = Topic(label=key, source="NLTK", lemas=[dico[key]])
                 self.topics[key] = topic
+            self.topics[key].count = dico[key].count
         print(self.topics)
         self.group_sub_word47()
         print(self.topics)
@@ -254,6 +242,25 @@ class NLTKModel:
         print(self.topics)
         self.group_gestalts()
         print(self.topics)
+
+    def doubling(self):
+        for key in self.topics.keys():
+            cloned = list(self.topics[key].lemas)
+            for lema in cloned:
+                if lema.previous is not None:
+                    lema2 = Lema(f"{lema.previous}_{lema.label}")
+                    if lema2 not in self.topics[key].lemas:
+                        self.topics[key].lemas.append(lema2)
+                    lema2 = [lema for lema in self.topics[key].lemas if lema == lema2][0]
+                    lema2.count += 1
+                    if lema.pre_previous is not None:
+                        lema3 = Lema(f"{lema.pre_previous}_{lema.previous}_{lema.label}")
+                        if lema3 not in self.topics[key].lemas:
+                            self.topics[key].lemas.append(lema3)
+                        lema3 = [lema for lema in self.topics[key].lemas if lema == lema3][0]
+                        lema3.count += 1
+
+
 
 
 

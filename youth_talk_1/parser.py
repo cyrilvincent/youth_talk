@@ -1,12 +1,9 @@
 import datetime
-
 import art
 import pandas as pd
 from sqlalchemy import select, text
-
 import config
 import argparse
-
 from dbcontext import Context
 
 

@@ -1,6 +1,6 @@
 import sys
 from unittest import TestCase
-from NLTK_model import NLTKModel
+from textrank_model import TextrankModel
 from sqlentities import Topic, Lema
 
 lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
@@ -13,19 +13,19 @@ class ISCRITests(TestCase):
         print(sys.version)
 
     def test_normalize(self):
-        m = NLTKModel()
+        m = TextrankModel()
         s = "Cyril Vincent éàè"
         s = m.normalize(s)
         self.assertEqual("cyril vincent eae", s)
 
     def test_split_phrases(self):
-        m = NLTKModel()
+        m = TextrankModel()
         s = "ab\ncd.e"
         l = m.split_phrases(s)
         self.assertEqual(["ab", "cd", "e"], l)
 
     def test_tokenize(self):
-        m = NLTKModel()
+        m = TextrankModel()
         res = m.tokenize(shakespear)
         print(res)
         res = m.tokenize(lorem)
@@ -63,18 +63,20 @@ class ISCRITests(TestCase):
         print(set(synonyms))
 
     def test_get_synonyms(self):
-        m = NLTKModel()
+        m = TextrankModel()
         res = m.get_synonyms("running")
+        print(res)
+        res = m.get_synonyms("elisa")
         print(res)
 
     def test_count(self):
-        m = NLTKModel()
+        m = TextrankModel()
         res = m.tokenize(shakespear)
         dico = m.count(res)
         print(print([(lema.label, lema.count) for lema in dico.values()]))
 
     def test_group_synonyms(self):
-        m = NLTKModel()
+        m = TextrankModel()
         t1 = Topic()
         t1.label = "marriage"
         t1.count = 1
@@ -95,7 +97,7 @@ class ISCRITests(TestCase):
         print(m.topics)
 
     def test_group(self):
-        m = NLTKModel()
+        m = TextrankModel()
         res = m.tokenize(shakespear)
         # res = m.tokenize(tanzania)
         dico = m.count(res)
@@ -103,25 +105,17 @@ class ISCRITests(TestCase):
         print(m.topics)
 
     def test_textrank(self):
-        m = NLTKModel()
+        m = TextrankModel()
         text = m.normalize(shakespear)
         phrases = m.textrank(text)
         print(phrases)
 
-
     def test_tokenize_textrank(self):
-        m = NLTKModel()
+        m = TextrankModel()
         res = m.tokenize(tanzania)
         print(res)
         res = m.tokenize_textrank(tanzania, 3)
         print(res)
-
-    def test_group_textrank(self):
-        m = NLTKModel()
-        res = m.tokenize_textrank(shakespear)
-        dico = m.count(res)
-        m.grouping(dico)
-        print(m.topics)
 
     def test_hash(self):
         dico: dict[Lema, int] = {}
@@ -132,10 +126,22 @@ class ISCRITests(TestCase):
         lema2.label = "toto"
         self.assertEqual(1, dico[lema2])
 
+    def test_group_textrank(self):
+        m = TextrankModel()
+        res = m.tokenize_textrank(shakespear)
+        dico = m.count(res)
+        m.grouping(dico)
+        print(m.topics)
+
     def test_doubling(self):
-        m = NLTKModel()
+        m = TextrankModel()
         res = m.tokenize_textrank(shakespear)
         dico = m.count(res)
         m.grouping(dico)
         m.doubling()
         print(m.topics)
+
+    def test_sentiment(self):
+        m = TextrankModel()
+        print(m.sentiment(shakespear))
+        print(m.sentiment(tanzania))

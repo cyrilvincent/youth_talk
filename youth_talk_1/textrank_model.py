@@ -1,27 +1,42 @@
-import datetime
 import difflib
 import unicodedata
-import os
 from nltk.corpus import wordnet
-from sqlentities import Lema, Topic, FormTopic
+from sqlalchemy import select
+
+from dbcontext import Context
+from sqlentities import Lema, Topic, Form, Stat
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import spacy
 import pytextrank
+import config
+import art
+import argparse
 
-os.environ["NLTK_DATA"] = r"C:\Users\conta\git-CVC\Skema\git-youth_talk\youth_talk_1\nltk"
 
-
-class NLTKModel:
+class TextrankModel:
 
     def __init__(self):
         self.min_length = 4
+        self.gestalt_ratio = 0.9
         self.synonym_dico: dict[str, list[str]] = {}
         self.topics: dict[str, Topic] = {}
-        self.nlp = spacy.load("en_core_web_sm")
+        self.nlp = spacy.load("en_core_web_sm")  # python -m spacy download en_core_web_sm
         self.nlp.add_pipe("textrank")
+        self.sentiment_analyser = SentimentIntensityAnalyzer()
 
     def textrank(self, text: str) -> list[tuple[str, int]]:
         doc = self.nlp(text)
         return [(phrase.text, phrase.count) for phrase in doc._.phrases]
+
+    def sentiment(self, text: str) -> dict[str, float]:
+        return self.sentiment_analyser.polarity_scores(text)["compound"]
+
+    def nb_words(self, text: str) -> int:
+        if len(text.strip()) == 0:
+            return 0
+        text = text.replace("\n", " ")
+        text = text.replace("|", " ")
+        return text.count(" ") + 1
 
 
     def gestalt(self, s1: str, s2: str):
@@ -65,7 +80,7 @@ class NLTKModel:
     def strip_accents(self, s: str):
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
-    def normalize(self, s: str):  # A porter dans lema
+    def normalize(self, s: str):
         s = s.lower()
         s = self.strip_accents(s)
         # s = self.remove_suffix(s)
@@ -80,6 +95,7 @@ class NLTKModel:
         return s
 
     def split_phrases(self, text: str) -> list[str]:
+        text = text.replace("|", ".")
         text = text.replace("\n", ".")
         text = text.replace("!", ".")
         text = text.replace(":", ".")
@@ -87,8 +103,8 @@ class NLTKModel:
         text = text.replace(",", ".")
         return text.split(".")
 
-    # def split_words(self, s: str) -> list[str]:
-    #     return s.split(" ")
+    def split_words(self, s: str) -> list[str]:
+        return s.split(" ")
 
     def split_lemas(self, s: str) -> list[Lema]:
         words = s.split(" ")
@@ -99,7 +115,6 @@ class NLTKModel:
             word = word.strip()
             if len(word) > 0:
                 lema = Lema(word, previous, pre_previous)
-                # lema.label, lema.previous, lema.pre_previous = word, previous, pre_previous
                 res.append(lema)
                 pre_previous = previous
                 previous = word
@@ -129,11 +144,6 @@ class NLTKModel:
 
     def remove_link_lemas(self, lemas: list[Lema]) -> list[Lema]:
         res = [lema for lema in lemas if not (self.is_link_word(lema.label))]
-        # for lema in res:
-        #     if lema.previous is not None and self.is_link_word(lema.previous):
-        #         lema.previous = None
-        #     if lema.pre_previous is not None and self.is_link_word(lema.pre_previous):
-        #         lema.pre_previous = None
         return res
 
     def get_sub_word47(self, word: str, lemas: list[Lema]) -> Lema | None:
@@ -171,7 +181,7 @@ class NLTKModel:
     def get_gestalt(self, s: str, lemas: list[Lema]) -> Lema | None:
         words = [lema.label for lema in lemas]
         word, score = self.gestalts(s, words)
-        if score > 0.9:
+        if score > self.gestalt_ratio:
             return [lema for lema in lemas if lema.label == word][0]
         return None
 
@@ -213,7 +223,7 @@ class NLTKModel:
         lemass = [lemas for lemas in lemass if len(lemas) > 0]
         return lemass
 
-    def tokenize_textrank(self, text: str, limit=3) -> list[list[Lema]]:
+    def tokenize_textrank(self, text: str, limit=config.textrank_limit) -> list[list[Lema]]:
         text = self.normalize(text)
         phrases = self.textrank(text)
         lemass = [self.split_lemas(p[0]) * p[1] for p in phrases[:limit]]
@@ -232,9 +242,9 @@ class NLTKModel:
     def grouping(self, dico: dict[str, Lema]):
         for key in dico.keys():
             if key not in self.topics:
-                topic = Topic(label=key, source="NLTK", lemas=[dico[key]])
+                topic = Topic(label=key, source="textrank", lemas=[dico[key]])
                 self.topics[key] = topic
-            self.topics[key].count = dico[key].count
+            self.topics[key].count = dico[key].count # Ca bugera avec une bd, mais je ne suis vraiment pas sur que topic.count serve car qu'il soit présent 2 fois ou 1 fois pour moi c'est idem
         print(self.topics)
         self.group_sub_word47()
         print(self.topics)
@@ -261,6 +271,121 @@ class NLTKModel:
                         lema3.count += 1
 
 
+class TextrankService:
+
+    def __init__(self, context):
+        self.context = context
+        self.model = TextrankModel()
+        self.nb_form = 0
+
+    def average(self, *args) -> float | None:
+        nb = 0
+        sum = 0
+        for arg in args:
+            if arg is not None:
+                nb += 1
+                sum += arg
+        if nb == 0:
+            return None
+        return sum / nb
+
+    def categorize(self, score: float | None) -> int | None:
+        if score is None:
+            return None
+        if score < 2.33:
+            return 0
+        if score > 3.67:
+            return 2
+        return 1
+
+    def analyse(self):
+        # joinload = self.session.execute(select(entities.Cart, 1).options(joinedload(entities.Cart.medias))).scalars().first()
+        # join + joinload = session.execute(select(Media).options(joinedload(Media.publisher)).join(Publisher).where(Publisher.name == "Vincent"))
+        forms: list[Form] = self.context.session.execute(select(Form).where(Form.empathy_answers > 0)).scalars().all()
+        for form in forms:
+            if (form.question_01_contrib1_answer is not None
+                    or form.question_01_contrib2_answer is not None
+                    or form.question_01_contrib3_answer is not None):
+                self.analyse_form(form)
+        print("Committing")
+        self.context.session.commit()
+
+    def analyse_form(self, form: Form):
+        self.nb_form += 1
+        phrase1_2 = ""
+        if form.question_01_contrib1_answer is not None and form.question_01_contrib1_answer != "":
+            phrase1_2 += form.question_01_contrib1_answer + "|"
+        if form.question_01_contrib2_answer is not None and form.question_01_contrib2_answer != "":
+            phrase1_2 += form.question_01_contrib2_answer + "|"
+        if form.question_01_contrib3_answer is not None and form.question_01_contrib3_answer != "":
+            phrase1_2 += form.question_01_contrib3_answer + "|"
+        if form.question_02_contrib1_answer is not None and form.question_02_contrib1_answer != "":
+            phrase1_2 += form.question_02_contrib1_answer + "|"
+        if form.question_02_contrib2_answer is not None and form.question_02_contrib2_answer != "":
+            phrase1_2 += form.question_02_contrib2_answer + "|"
+        if form.question_02_contrib3_answer is not None and form.question_02_contrib3_answer != "":
+            phrase1_2 += form.question_02_contrib3_answer + "|"
+        phrase1_2 = phrase1_2.strip()
+        phrase3_4 = ""
+        if form.question_03_contrib1_answer is not None and form.question_03_contrib1_answer != "":
+            phrase3_4 += form.question_03_contrib1_answer + "|"
+        if form.question_03_contrib2_answer is not None and form.question_03_contrib2_answer != "":
+            phrase3_4 += form.question_03_contrib2_answer + "|"
+        if form.question_03_contrib3_answer is not None and form.question_03_contrib3_answer != "":
+            phrase3_4 += form.question_03_contrib3_answer + "|"
+        if form.question_04_contrib1_answer is not None and form.question_04_contrib1_answer != "":
+            phrase3_4 += form.question_04_contrib1_answer + "|"
+        if form.question_04_contrib2_answer is not None and form.question_04_contrib2_answer != "":
+            phrase3_4 += form.question_04_contrib2_answer + "|"
+        if form.question_04_contrib3_answer is not None and form.question_04_contrib3_answer != "":
+            phrase3_4 += form.question_04_contrib3_answer + "|"
+        phrase3_4 = phrase3_4.strip()
+        self.make_stat(form, phrase1_2, phrase3_4)
+
+    def make_stat(self, form: Form, phrase1_2: str, phrase3_4: str):
+        form.stat = Stat()
+        form.stat.q1_2_nb_word = self.model.nb_words(phrase1_2)
+        if form.stat.q1_2_nb_word > 0:
+            form.stat.q1_2_sentiment = self.model.sentiment(phrase1_2)
+        form.stat.q3_4_nb_word = self.model.nb_words(phrase3_4)
+        if form.stat.q3_4_nb_word > 0:
+            form.stat.q3_4_sentiment = self.model.sentiment(phrase3_4)
+        form.stat.pd_score = self.average(form.empathy_pd_6, form.empathy_pd_17, form.empathy_pd_24, form.empathy_pd_27)
+        form.stat.pd_category = self.categorize(form.stat.pd_score)
+        ec18 = None
+        if form.empathy_ec_18 is not None and form.empathy_ec_18 != "*":
+            ec18 = 6 - int(form.empathy_ec_18)
+        form.stat.ec_score = self.average(form.empathy_ec_2, form.empathy_ec_9, ec18, form.empathy_ec_22)
+        form.stat.ec_category = self.categorize(form.stat.ec_score)
+        print(form.stat.q1_2_nb_word, phrase1_2[:50])
+
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    art.tprint(config.name, "big")
+    print("Textrank Service")
+    print("================")
+    print(f"V{config.version}")
+    print(config.copyright)
+    print()
+    parser = argparse.ArgumentParser(description="Textrank Service")
+    parser.add_argument("-e", "--echo", help="Sql Alchemy echo", action="store_true")
+    args = parser.parse_args()
+    context = Context()
+    context.create(echo=args.echo)
+    db_size = context.db_size()
+    print(f"Database {context.db_name}: {db_size:.0f} Mb")
+    a = TextrankService(context)
+    a.analyse()
+    print(f"Nb form: {a.nb_form}")
+    new_db_size = context.db_size()
+    print(f"Database {context.db_name}: {new_db_size:.0f} Mb")
+    print(f"Database grows: {new_db_size - db_size:.0f} Mb ({((new_db_size - db_size) / db_size) * 100:.1f}%)")
 
 
 

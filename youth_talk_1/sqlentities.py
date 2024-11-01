@@ -14,11 +14,30 @@ class Form(Base):
 
     id = Column(Integer, primary_key=True)
     question_01_contrib1_answer = Column(String())
+    question_01_contrib2_answer = Column(String())
+    question_01_contrib3_answer = Column(String())
     question_02_contrib1_answer = Column(String())
+    question_02_contrib2_answer = Column(String())
+    question_02_contrib3_answer = Column(String())
     question_03_contrib1_answer = Column(String())
+    question_03_contrib2_answer = Column(String())
+    question_03_contrib3_answer = Column(String())
+    question_04_contrib1_answer = Column(String())
+    question_04_contrib2_answer = Column(String())
+    question_04_contrib3_answer = Column(String())
+    empathy_answers = Column(BigInteger(), nullable=False)
+    empathy_pd_6 = Column(Integer)
+    empathy_pd_17 = Column(Integer)
+    empathy_pd_24 = Column(Integer)
+    empathy_pd_27 = Column(Integer)
+    empathy_ec_2 = Column(Integer)
+    empathy_ec_9 = Column(Integer)
+    empathy_ec_18 = Column(String(1))
+    empathy_ec_22 = Column(Integer)
     form_topics: Mapped[list["FormTopic"]] = relationship(back_populates="form")
     date_added = Column(DateTime, nullable=False)
     date_computed = Column(DateTime)
+    stat: Mapped["Stat"] = relationship(back_populates="form", uselist=False)
 
     def __repr__(self):
         return f"{self.id}"
@@ -30,7 +49,6 @@ class Topic(Base):
     id = Column(BigInteger, primary_key=True)
     label = Column(String(50), nullable=False, index=True)
     form_topics: Mapped[list["FormTopic"]] = relationship(back_populates="topic")
-    stat: Mapped["Stat"] = relationship(back_populates="topic", uselist=False)
     lemas: Mapped[list["Lema"]] = relationship(back_populates="topic")
     count = Column(Integer, nullable=False)
     source = Column(String(5), nullable=False, index=True)
@@ -54,6 +72,7 @@ class FormTopic(Base):
     form: Mapped[Form] = relationship(back_populates="form_topics")
     topic_id = Column(ForeignKey('topic.id'), nullable=False)
     topic: Mapped[Topic] = relationship(back_populates="form_topics")
+    question_nb = Column(Integer, nullable=False)
     count = Column(Integer, nullable=False)
     date = Column(DateTime, nullable=False)
 
@@ -75,16 +94,15 @@ class Lema(Base):
     count = Column(Integer, nullable=False)
     topic_id = Column(ForeignKey('topic.id'), nullable=False)
     topic: Mapped[Topic] = relationship(back_populates="lemas")
-    previous = Column(String())
-    pre_previous = Column(String())
     date = Column(DateTime, nullable=False)
 
     def __init__(self, label=None, previous=None, pre_previous=None):
         self.label = label
-        self.previous = previous
-        self.pre_previous = pre_previous
+        self.previous: str | None = previous
+        self.pre_previous: str | None = pre_previous
         self.count = 0
         self.date = datetime.datetime.now()
+        self.local_count = 0
 
     def __repr__(self):
         return f"{self.label} {self.count}"
@@ -99,11 +117,20 @@ class Lema(Base):
 class Stat(Base):
     __tablename__ = "stat"
 
-    id = Column(ForeignKey('topic.id'), primary_key=True)
+    id = Column(ForeignKey('form.id'), primary_key=True)
     pd_score = Column(Float)
-    pd_category = Column(Integer)
-    # topic_id = Column(ForeignKey('topic.id'), nullable=False)
-    topic: Mapped[Topic] = relationship(back_populates="stat")
+    pd_category = Column(SmallInteger)
+    ec_score = Column(Float)
+    ec_category = Column(SmallInteger)
+    f_score = Column(Float)
+    f_category = Column(SmallInteger)
+    pt_score = Column(Float)
+    pt_category = Column(SmallInteger)
+    q1_2_nb_word = Column(Integer)
+    q1_2_sentiment = Column(Float)
+    q3_4_nb_word = Column(Integer)
+    q3_4_sentiment = Column(Float)
+    form: Mapped[Form] = relationship(back_populates="stat")
 
     def __repr__(self):
         return f"{self.id} {self.pd_category}"

@@ -31,20 +31,6 @@ class ISCRITests(TestCase):
         res = m.tokenize(lorem)
         print(res)
 
-    # def test_split_2_words(self):
-    #     m = SimpleTextModel()
-    #     s = m.split_phrases(lorem)[0]
-    #     res = m.split_2_words(s)
-    #     print(res)
-
-    # def test_is_synonym(self):
-    #     syno = Synonyms(search_string='mother')
-    #     res = syno.find_synonyms()
-    #     print(res)
-    #     syno = Synonyms(search_string='father')
-    #     res = syno.find_synonyms()
-    #     print(res)
-
     def test_wordnet(self):
         import os
         os.environ["NLTK_DATA"] = r"C:\Users\conta\git-CVC\Skema\git-youth_talk\youth_talk_1\nltk"
@@ -132,6 +118,7 @@ class ISCRITests(TestCase):
         dico = m.count(res)
         m.grouping(dico)
         print(m.topics)
+        # {'minds': minds 1 [minds 1], 'fixed': fixed 1 [fixed 1], 'mark': mark 1 [mark 1], 'mariage': mariage 4 [mariage 1, wedding 1, wedd 1, marriage 1], 'war': war 1 [war 1], 'impediments': impediments 1 [impediments 1]}
 
     def test_doubling(self):
         m = TextrankModel()

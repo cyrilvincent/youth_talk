@@ -34,6 +34,14 @@ class Form(Base):
     empathy_ec_9 = Column(Integer)
     empathy_ec_18 = Column(String(1))
     empathy_ec_22 = Column(Integer)
+    empathy_pt_8 = Column(Integer)
+    empathy_pt_11 = Column(Integer)
+    empathy_pt_25 = Column(Integer)
+    empathy_pt_28 = Column(Integer)
+    empathy_f_5 = Column(Integer)
+    empathy_f_16 = Column(Integer)
+    empathy_f_23 = Column(Integer)
+    empathy_f_26 = Column(Integer)
     form_topics: Mapped[list["FormTopic"]] = relationship(back_populates="form")
     date_added = Column(DateTime, nullable=False)
     date_computed = Column(DateTime)
@@ -122,10 +130,12 @@ class Stat(Base):
     pd_category = Column(SmallInteger)
     ec_score = Column(Float)
     ec_category = Column(SmallInteger)
-    f_score = Column(Float)
-    f_category = Column(SmallInteger)
     pt_score = Column(Float)
     pt_category = Column(SmallInteger)
+    f_score = Column(Float)
+    f_category = Column(SmallInteger)
+    empathy_score = Column(Float)
+    empathy_category = Column(SmallInteger)
     q1_2_nb_word = Column(Integer)
     q1_2_sentiment = Column(Float)
     q3_4_nb_word = Column(Integer)
@@ -133,6 +143,6 @@ class Stat(Base):
     form: Mapped[Form] = relationship(back_populates="stat")
 
     def __repr__(self):
-        return f"{self.id} {self.pd_category}"
+        return f"{self.id} {self.q1_2_nb_word} {self.q1_2_sentiment}"
 
 

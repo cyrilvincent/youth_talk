@@ -38,7 +38,6 @@ class TextrankModel:
         text = text.replace("|", " ")
         return text.count(" ") + 1
 
-
     def gestalt(self, s1: str, s2: str):
         sm = difflib.SequenceMatcher(None, s1, s2)
         return sm.ratio()
@@ -150,7 +149,7 @@ class TextrankModel:
         t = 4 / 7
         if word == "" or word is None:
             return None
-        if word == "mariage":
+        if word == "wedding":
             pass
         for lema in lemas:
             w1 = word
@@ -163,7 +162,7 @@ class TextrankModel:
                 w2 = w2[:-3]
             elif w2.endswith("ed"):
                 w2 = w2[:2]
-            if (w1.startswith(w2) or w2.startswith(w1)) and len(w1) / len(w2) > t:
+            if w2.startswith(w1) and len(w2) / len(w1) > t:
                 return lema
         return None
 
@@ -194,15 +193,20 @@ class TextrankModel:
             if word in self.topics:
                 topics = [topic for topic in self.topics.values() if topic.label != word]
                 for topic in topics:
-                    if word == "mariage":
+                    if word == "wedding":
                         pass
                     lema = group_fn(word, topic.lemas)
                     if lema is not None:
-                        self.topics[word].count += self.topics[topic.label].count
-                        for lema2 in list(self.topics[topic.label].lemas):
-                            if lema2 not in self.topics[word].lemas:
-                                self.topics[word].lemas.append(lema2)
-                        del self.topics[topic.label]
+                        # self.topics[word].count += self.topics[topic.label].count
+                        # for lema2 in list(self.topics[topic.label].lemas):
+                        #     if lema2 not in self.topics[word].lemas:
+                        #         self.topics[word].lemas.append(lema2)
+                        # del self.topics[topic.label]
+                        self.topics[topic.label].count += self.topics[word].count
+                        for lema2 in list(self.topics[word].lemas):
+                            if lema2 not in self.topics[topic.label].lemas:
+                                self.topics[topic.label].lemas.append(lema2)
+                        del self.topics[word]
 
     def group_synonyms(self):
         self.group_generic(self.get_synonym)
@@ -239,13 +243,15 @@ class TextrankModel:
                 dico[lema.label].count += 1
         return dico
 
-    def grouping(self, dico: dict[str, Lema]):
+    def grouping(self, dico: dict[str, Lema]) -> list[Topic]:  #TODO
         for key in dico.keys():
             if key not in self.topics:
                 topic = Topic(label=key, source="textrank", lemas=[dico[key]])
                 self.topics[key] = topic
-            self.topics[key].count = dico[key].count # Ca bugera avec une bd, mais je ne suis vraiment pas sur que topic.count serve car qu'il soit présent 2 fois ou 1 fois pour moi c'est idem
+                self.topics[key].count = 0
+            self.topics[key].count += 1
         print(self.topics)
+        print("47")
         self.group_sub_word47()
         print(self.topics)
         self.group_synonyms()
@@ -263,12 +269,12 @@ class TextrankModel:
                         self.topics[key].lemas.append(lema2)
                     lema2 = [lema for lema in self.topics[key].lemas if lema == lema2][0]
                     lema2.count += 1
-                    if lema.pre_previous is not None:
-                        lema3 = Lema(f"{lema.pre_previous}_{lema.previous}_{lema.label}")
-                        if lema3 not in self.topics[key].lemas:
-                            self.topics[key].lemas.append(lema3)
-                        lema3 = [lema for lema in self.topics[key].lemas if lema == lema3][0]
-                        lema3.count += 1
+                    # if lema.pre_previous is not None:
+                    #     lema3 = Lema(f"{lema.pre_previous}_{lema.previous}_{lema.label}")
+                    #     if lema3 not in self.topics[key].lemas:
+                    #         self.topics[key].lemas.append(lema3)
+                    #     lema3 = [lema for lema in self.topics[key].lemas if lema == lema3][0]
+                    #     lema3.count += 1
 
 
 class TextrankService:
@@ -298,7 +304,7 @@ class TextrankService:
             return 2
         return 1
 
-    def analyse(self):
+    def make_stats(self):
         # joinload = self.session.execute(select(entities.Cart, 1).options(joinedload(entities.Cart.medias))).scalars().first()
         # join + joinload = session.execute(select(Media).options(joinedload(Media.publisher)).join(Publisher).where(Publisher.name == "Vincent"))
         forms: list[Form] = self.context.session.execute(select(Form).where(Form.empathy_answers > 0)).scalars().all()
@@ -306,41 +312,44 @@ class TextrankService:
             if (form.question_01_contrib1_answer is not None
                     or form.question_01_contrib2_answer is not None
                     or form.question_01_contrib3_answer is not None):
-                self.analyse_form(form)
+                self.nb_form += 1
+                phrase1_2 = self.get_phrase1_2(form)
+                phrase3_4 = self.get_phrase3_4(form)
+                self.make_stat(form, phrase1_2, phrase3_4)
         print("Committing")
         self.context.session.commit()
 
-    def analyse_form(self, form: Form):
-        self.nb_form += 1
+    def get_phrase1_2(self, form: Form, sep="|") -> str:
         phrase1_2 = ""
         if form.question_01_contrib1_answer is not None and form.question_01_contrib1_answer != "":
-            phrase1_2 += form.question_01_contrib1_answer + "|"
+            phrase1_2 += form.question_01_contrib1_answer + sep
         if form.question_01_contrib2_answer is not None and form.question_01_contrib2_answer != "":
-            phrase1_2 += form.question_01_contrib2_answer + "|"
+            phrase1_2 += form.question_01_contrib2_answer + sep
         if form.question_01_contrib3_answer is not None and form.question_01_contrib3_answer != "":
-            phrase1_2 += form.question_01_contrib3_answer + "|"
+            phrase1_2 += form.question_01_contrib3_answer + sep
         if form.question_02_contrib1_answer is not None and form.question_02_contrib1_answer != "":
-            phrase1_2 += form.question_02_contrib1_answer + "|"
+            phrase1_2 += form.question_02_contrib1_answer + sep
         if form.question_02_contrib2_answer is not None and form.question_02_contrib2_answer != "":
             phrase1_2 += form.question_02_contrib2_answer + "|"
         if form.question_02_contrib3_answer is not None and form.question_02_contrib3_answer != "":
-            phrase1_2 += form.question_02_contrib3_answer + "|"
-        phrase1_2 = phrase1_2.strip()
+            phrase1_2 += form.question_02_contrib3_answer + sep
+        return phrase1_2.strip()
+
+    def get_phrase3_4(self, form: Form, sep="|") -> str:
         phrase3_4 = ""
         if form.question_03_contrib1_answer is not None and form.question_03_contrib1_answer != "":
-            phrase3_4 += form.question_03_contrib1_answer + "|"
+            phrase3_4 += form.question_03_contrib1_answer + sep
         if form.question_03_contrib2_answer is not None and form.question_03_contrib2_answer != "":
-            phrase3_4 += form.question_03_contrib2_answer + "|"
+            phrase3_4 += form.question_03_contrib2_answer + sep
         if form.question_03_contrib3_answer is not None and form.question_03_contrib3_answer != "":
-            phrase3_4 += form.question_03_contrib3_answer + "|"
+            phrase3_4 += form.question_03_contrib3_answer + sep
         if form.question_04_contrib1_answer is not None and form.question_04_contrib1_answer != "":
-            phrase3_4 += form.question_04_contrib1_answer + "|"
+            phrase3_4 += form.question_04_contrib1_answer + sep
         if form.question_04_contrib2_answer is not None and form.question_04_contrib2_answer != "":
-            phrase3_4 += form.question_04_contrib2_answer + "|"
+            phrase3_4 += form.question_04_contrib2_answer + sep
         if form.question_04_contrib3_answer is not None and form.question_04_contrib3_answer != "":
-            phrase3_4 += form.question_04_contrib3_answer + "|"
-        phrase3_4 = phrase3_4.strip()
-        self.make_stat(form, phrase1_2, phrase3_4)
+            phrase3_4 += form.question_04_contrib3_answer + sep
+        return phrase3_4.strip()
 
     def make_stat(self, form: Form, phrase1_2: str, phrase3_4: str):
         form.stat = Stat()
@@ -357,7 +366,14 @@ class TextrankService:
             ec18 = 6 - int(form.empathy_ec_18)
         form.stat.ec_score = self.average(form.empathy_ec_2, form.empathy_ec_9, ec18, form.empathy_ec_22)
         form.stat.ec_category = self.categorize(form.stat.ec_score)
-        print(form.stat.q1_2_nb_word, phrase1_2[:50])
+        form.stat.pt_score = self.average(form.empathy_pt_8, form.empathy_pt_11, form.empathy_pt_25, form.empathy_pt_28)
+        form.stat.pt_category = self.categorize(form.stat.pt_score)
+        form.stat.f_score = self.average(form.empathy_f_5, form.empathy_f_16, form.empathy_f_23, form.empathy_f_26)
+        form.stat.f_category = self.categorize(form.stat.f_score)
+        form.stat.empathy_score = self.average(form.stat.pd_score, form.stat.ec_score,
+                                               form.stat.pt_score, form.stat.f_score)
+        form.stat.empathy_category = self.categorize(form.stat.empathy_score)
+        print(form.stat.q1_2_nb_word, phrase1_2[:50], form.stat.q3_4_nb_word, phrase3_4[:50])
 
 
 
@@ -381,7 +397,7 @@ if __name__ == '__main__':
     db_size = context.db_size()
     print(f"Database {context.db_name}: {db_size:.0f} Mb")
     a = TextrankService(context)
-    a.analyse()
+    a.make_stats()
     print(f"Nb form: {a.nb_form}")
     new_db_size = context.db_size()
     print(f"Database {context.db_name}: {new_db_size:.0f} Mb")

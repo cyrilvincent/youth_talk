@@ -1,1 +1,10 @@
 Avoir des textes long : encourage avec un widget comme pour les mot de passe longs
+NbTopic = NbTopic total
+NbTopic+ = NbTopic category 2
+NbTopic- = NbTopic category 0
+RatioTopic+ = NbTopic+/(NbTopic- + 1)
+RatioTopic- = NbTopic-/(NbTopic+ + 1)
+Topic+Score = NbTopic+ * RatioTopic+ = NbTopic+²/(NbTopic- + 1)
+Topic-Score = NbTopic-²/(NbTopic+ + 1)
+Topic+LowNoise = NbTopic+/exp(NbTopic-)
+Topic-LowNoise = NbTopic-/exp(NbTopic+)

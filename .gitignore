@@ -1,5 +1,4 @@
-config.py
-
+Cultural-Analytics
 **/.idea/**
 *.pickle
 **/chromedriver_win32/**

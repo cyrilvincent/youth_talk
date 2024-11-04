@@ -1,7 +1,9 @@
+import datetime
 import difflib
 import unicodedata
 from nltk.corpus import wordnet
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from dbcontext import Context
 from sqlentities import Lema, Topic, Form, Stat
@@ -18,6 +20,9 @@ class TextrankModel:
     def __init__(self):
         self.min_length = 4
         self.gestalt_ratio = 0.9
+        self.q1_2 = 12
+        self.q3_4 = 34
+        self.r47 = 4 / 7
         self.synonym_dico: dict[str, list[str]] = {}
         self.topics: dict[str, Topic] = {}
         self.nlp = spacy.load("en_core_web_sm")  # python -m spacy download en_core_web_sm
@@ -90,7 +95,6 @@ class TextrankModel:
         s = s.replace("-", " ")
         s = s.replace("+", " ")
         s = s.replace("/", " ")
-
         return s
 
     def split_phrases(self, text: str) -> list[str]:
@@ -100,6 +104,7 @@ class TextrankModel:
         text = text.replace(":", ".")
         text = text.replace("?", ".")
         text = text.replace(",", ".")
+        text = text.replace("..", ".")
         return text.split(".")
 
     def split_words(self, s: str) -> list[str]:
@@ -109,13 +114,11 @@ class TextrankModel:
         words = s.split(" ")
         res = []
         previous = None
-        pre_previous = None
         for word in words:
             word = word.strip()
             if len(word) > 0:
-                lema = Lema(word, previous, pre_previous)
+                lema = Lema(word, previous)
                 res.append(lema)
-                pre_previous = previous
                 previous = word
         return res
 
@@ -129,8 +132,6 @@ class TextrankModel:
         for lema in res:
             if lema.previous is not None and self.is_short(lema.previous):
                 lema.previous = None
-            if lema.pre_previous is not None and self.is_short(lema.pre_previous):
-                lema.pre_previous = None
         return res
 
     def is_link_word(self, s: str) -> bool:
@@ -138,15 +139,22 @@ class TextrankModel:
             return True
         if s.isnumeric():
             return True
-        links = ["with", "which", "when", "under", "upper", "ever", "never", "less", "more", "true", "false"]
+        links = ["with", "which", "when", "under", "upper", "ever", "never", "less", "more", "true", "false", "other",
+                 "have", "that", "thus", "then", "them", "being", "self", "either", "neither", "will", "still", "where",
+                 "come", "they", "without", "very", "from", "after", "before"]
         return s in links
 
     def remove_link_lemas(self, lemas: list[Lema]) -> list[Lema]:
         res = [lema for lema in lemas if not (self.is_link_word(lema.label))]
         return res
 
+    def get_lema_equals(self, word, lemas: list[Lema]) -> Lema | None:
+        for lema in lemas:
+            if lema.label == word:
+                return lema
+        return None
+
     def get_sub_word47(self, word: str, lemas: list[Lema]) -> Lema | None:
-        t = 4 / 7
         if word == "" or word is None:
             return None
         if word == "wedding":
@@ -162,7 +170,8 @@ class TextrankModel:
                 w2 = w2[:-3]
             elif w2.endswith("ed"):
                 w2 = w2[:2]
-            if w2.startswith(w1) and len(w2) / len(w1) > t:
+            if ((w2.startswith(w1) and len(w2) / len(w1) > self.r47)
+                    or (w1.startswith(w2) and len(w1) / len(w2) > self.r47)):
                 return lema
         return None
 
@@ -184,41 +193,34 @@ class TextrankModel:
             return [lema for lema in lemas if lema.label == word][0]
         return None
 
-    def group_sub_word47(self):
-        self.group_generic(self.get_sub_word47)
+    def group_generic(self, lema: Lema, group_fn) -> Topic | None:
+        for topic in self.topics.values():
+            lema_res = group_fn(lema.label, topic.lemas)
+            if lema_res is not None:
+                topic.count += lema_res.count
+                if group_fn == self.get_lema_equals:
+                    lema_res.count += lema.count
+                else:
+                    topic.lemas.append(lema)
+                return topic
+        return None
 
-    def group_generic(self, group_fn):
-        cloned = dict(self.topics)
-        for word in cloned.keys():
-            if word in self.topics:
-                topics = [topic for topic in self.topics.values() if topic.label != word]
-                for topic in topics:
-                    if word == "wedding":
-                        pass
-                    lema = group_fn(word, topic.lemas)
-                    if lema is not None:
-                        # self.topics[word].count += self.topics[topic.label].count
-                        # for lema2 in list(self.topics[topic.label].lemas):
-                        #     if lema2 not in self.topics[word].lemas:
-                        #         self.topics[word].lemas.append(lema2)
-                        # del self.topics[topic.label]
-                        self.topics[topic.label].count += self.topics[word].count
-                        for lema2 in list(self.topics[word].lemas):
-                            if lema2 not in self.topics[topic.label].lemas:
-                                self.topics[topic.label].lemas.append(lema2)
-                        del self.topics[word]
+    def group_lema_equals(self, lema: Lema) -> Topic | None:
+        return self.group_generic(lema, self.get_lema_equals)
 
-    def group_synonyms(self):
-        self.group_generic(self.get_synonym)
+    def group_sub_word47(self, lema: Lema) -> Topic | None:
+        return self.group_generic(lema, self.get_sub_word47)
 
-    def group_gestalts(self):
-        self.group_generic(self.get_gestalt)
+    def group_synonyms(self, lema: Lema) -> Topic | None:
+        return self.group_generic(lema, self.get_synonym)
 
-    # Utiliser tokenize_textrank à la place
+    def group_gestalts(self, lema: Lema) -> Topic | None:
+        return self.group_generic(lema, self.get_gestalt)
+
     def tokenize(self, text: str) -> list[list[Lema]]:
         text = self.normalize(text)
         phrases = self.split_phrases(text)
-        lemass = [self.split_lemas(p) for p in phrases]
+        lemass = [self.split_lemas(p) for p in phrases]  # Trier par count
         return self.tokenize_lemass(lemass)
 
     def tokenize_lemass(self, lemass: list[list[Lema]]) -> list[list[Lema]]:
@@ -243,38 +245,38 @@ class TextrankModel:
                 dico[lema.label].count += 1
         return dico
 
-    def grouping(self, dico: dict[str, Lema]) -> list[Topic]:  #TODO
+    def grouping(self, dico: dict[str, Lema]) -> list[Topic]:
+        topics = []
         for key in dico.keys():
-            if key not in self.topics:
-                topic = Topic(label=key, source="textrank", lemas=[dico[key]])
-                self.topics[key] = topic
-                self.topics[key].count = 0
-            self.topics[key].count += 1
-        print(self.topics)
-        print("47")
-        self.group_sub_word47()
-        print(self.topics)
-        self.group_synonyms()
-        print(self.topics)
-        self.group_gestalts()
-        print(self.topics)
+            if key in self.topics:
+                topic = self.topics[key]
+                topic.count += 1
+                topic.lemas[0].count += dico[key].count
+            else:
+                topic = self.group_lema_equals(dico[key].label)
+                if topic is None:
+                    topic = self.group_sub_word47(dico[key].label)
+                    if topic is None:
+                        topic = self.group_gestalts(dico[key].label)
+                        if topic is None:
+                            topic = self.group_synonyms(dico[key].label)
+                            if topic is None:
+                                topic = Topic(label=key, source="textrank", lemas=[dico[key]])
+                                topic.count = 1
+                                self.topics[key] = topic
+            topics.append(topic)
+        return topics
 
-    def doubling(self):
-        for key in self.topics.keys():
-            cloned = list(self.topics[key].lemas)
+    def doubling(self, topics: list[Topic]):
+        for topic in topics:
+            cloned = list(topic.lemas)
             for lema in cloned:
                 if lema.previous is not None:
                     lema2 = Lema(f"{lema.previous}_{lema.label}")
-                    if lema2 not in self.topics[key].lemas:
-                        self.topics[key].lemas.append(lema2)
-                    lema2 = [lema for lema in self.topics[key].lemas if lema == lema2][0]
+                    if lema2 not in topic.lemas:
+                        topic.lemas.append(lema2)
+                    lema2 = [lema for lema in topic.lemas if lema == lema2][0]
                     lema2.count += 1
-                    # if lema.pre_previous is not None:
-                    #     lema3 = Lema(f"{lema.pre_previous}_{lema.previous}_{lema.label}")
-                    #     if lema3 not in self.topics[key].lemas:
-                    #         self.topics[key].lemas.append(lema3)
-                    #     lema3 = [lema for lema in self.topics[key].lemas if lema == lema3][0]
-                    #     lema3.count += 1
 
 
 class TextrankService:
@@ -283,6 +285,7 @@ class TextrankService:
         self.context = context
         self.model = TextrankModel()
         self.nb_form = 0
+        self.nb_total_form = 0
 
     def average(self, *args) -> float | None:
         nb = 0
@@ -305,8 +308,6 @@ class TextrankService:
         return 1
 
     def make_stats(self):
-        # joinload = self.session.execute(select(entities.Cart, 1).options(joinedload(entities.Cart.medias))).scalars().first()
-        # join + joinload = session.execute(select(Media).options(joinedload(Media.publisher)).join(Publisher).where(Publisher.name == "Vincent"))
         forms: list[Form] = self.context.session.execute(select(Form).where(Form.empathy_answers > 0)).scalars().all()
         for form in forms:
             if (form.question_01_contrib1_answer is not None
@@ -319,7 +320,7 @@ class TextrankService:
         print("Committing")
         self.context.session.commit()
 
-    def get_phrase1_2(self, form: Form, sep="|") -> str:
+    def get_phrase1_2(self, form: Form, sep=". ") -> str:
         phrase1_2 = ""
         if form.question_01_contrib1_answer is not None and form.question_01_contrib1_answer != "":
             phrase1_2 += form.question_01_contrib1_answer + sep
@@ -330,12 +331,12 @@ class TextrankService:
         if form.question_02_contrib1_answer is not None and form.question_02_contrib1_answer != "":
             phrase1_2 += form.question_02_contrib1_answer + sep
         if form.question_02_contrib2_answer is not None and form.question_02_contrib2_answer != "":
-            phrase1_2 += form.question_02_contrib2_answer + "|"
+            phrase1_2 += form.question_02_contrib2_answer + sep
         if form.question_02_contrib3_answer is not None and form.question_02_contrib3_answer != "":
             phrase1_2 += form.question_02_contrib3_answer + sep
         return phrase1_2.strip()
 
-    def get_phrase3_4(self, form: Form, sep="|") -> str:
+    def get_phrase3_4(self, form: Form, sep=". ") -> str:
         phrase3_4 = ""
         if form.question_03_contrib1_answer is not None and form.question_03_contrib1_answer != "":
             phrase3_4 += form.question_03_contrib1_answer + sep
@@ -353,6 +354,7 @@ class TextrankService:
 
     def make_stat(self, form: Form, phrase1_2: str, phrase3_4: str):
         form.stat = Stat()
+        form.stat.date = datetime.datetime.now()
         form.stat.q1_2_nb_word = self.model.nb_words(phrase1_2)
         if form.stat.q1_2_nb_word > 0:
             form.stat.q1_2_sentiment = self.model.sentiment(phrase1_2)
@@ -375,11 +377,39 @@ class TextrankService:
         form.stat.empathy_category = self.categorize(form.stat.empathy_score)
         print(form.stat.q1_2_nb_word, phrase1_2[:50], form.stat.q3_4_nb_word, phrase3_4[:50])
 
+    def make_q1_2_textrank(self, mode="textrank"):
+        print(f"Textranking Q1 Q2 in mode {mode}")
+        self.load_topics()
+        forms: list[Form] = self.context.session.execute(
+            select(Form).join(Stat).options(joinedload(Form.stat))
+            .where((Form.empathy_answers > 0) & (Stat.textrank_date.is_(None)) & (Stat.q1_2_nb_word > 0))
+        ).scalars().all()
+        self.nb_total_form = len(forms)
+        self.nb_form = 0
+        print(f"Textranking {self.nb_total_form} forms")
+        for form in forms[:10]:
+            phrase1_2 = self.get_phrase1_2(form)
+            if "war" in phrase1_2:
+                pass
+            if mode == "textrank":
+                lemass = self.model.tokenize_textrank(phrase1_2)
+            else:
+                lemass = self.model.tokenize(phrase1_2)
+            dico = self.model.count(lemass)  # Pour nltk prendre les 10 premiers
+            print(phrase1_2[:200])
+            print(dico)
+            topics = self.model.grouping(dico)
+            self.nb_form += 1
+            if self.nb_form % 100 == 0:
+                print(f"Compute {self.nb_form}/{self.nb_total_form} forms")
 
-
-
-
-
+    def load_topics(self):
+        print("Loading topics")
+        topics = self.context.session.execute(
+            select(Topic).options(joinedload(Topic.lemas)).where(Topic.source == "textrank")).scalars().all()
+        for topic in topics:
+            self.model.topics[topic.label] = topic
+        print(f"{len(self.model.topics)} topics in cache")
 
 
 if __name__ == '__main__':
@@ -389,15 +419,13 @@ if __name__ == '__main__':
     print(f"V{config.version}")
     print(config.copyright)
     print()
-    parser = argparse.ArgumentParser(description="Textrank Service")
-    parser.add_argument("-e", "--echo", help="Sql Alchemy echo", action="store_true")
-    args = parser.parse_args()
     context = Context()
-    context.create(echo=args.echo)
+    context.create(echo=False)
     db_size = context.db_size()
     print(f"Database {context.db_name}: {db_size:.0f} Mb")
     a = TextrankService(context)
-    a.make_stats()
+    # a.make_stats()
+    a.make_q1_2_textrank()
     print(f"Nb form: {a.nb_form}")
     new_db_size = context.db_size()
     print(f"Database {context.db_name}: {new_db_size:.0f} Mb")

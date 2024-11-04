@@ -80,11 +80,11 @@ class FormTopic(Base):
     form: Mapped[Form] = relationship(back_populates="form_topics")
     topic_id = Column(ForeignKey('topic.id'), nullable=False)
     topic: Mapped[Topic] = relationship(back_populates="form_topics")
-    question_nb = Column(Integer, nullable=False)
-    count = Column(Integer, nullable=False)
+    question_nb = Column(Integer, nullable=False)  #12 or 34
+    count = Column(Integer, nullable=False) # Ne sert à rien
     date = Column(DateTime, nullable=False)
 
-    __table_args__ = (UniqueConstraint('form_id', 'topic_id'),)
+    __table_args__ = (UniqueConstraint('form_id', 'topic_id', 'question_nb'),)
 
     @property
     def key(self):
@@ -104,10 +104,9 @@ class Lema(Base):
     topic: Mapped[Topic] = relationship(back_populates="lemas")
     date = Column(DateTime, nullable=False)
 
-    def __init__(self, label=None, previous=None, pre_previous=None):
+    def __init__(self, label=None, previous=None):
         self.label = label
         self.previous: str | None = previous
-        self.pre_previous: str | None = pre_previous
         self.count = 0
         self.date = datetime.datetime.now()
         self.local_count = 0
@@ -140,6 +139,12 @@ class Stat(Base):
     q1_2_sentiment = Column(Float)
     q3_4_nb_word = Column(Integer)
     q3_4_sentiment = Column(Float)
+    date = Column(DateTime, nullable=False)
+    textrank_date = Column(DateTime)
+    td_idf_date = Column(DateTime)
+    openai_date = Column(DateTime)
+
+
     form: Mapped[Form] = relationship(back_populates="stat")
 
     def __repr__(self):

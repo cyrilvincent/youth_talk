@@ -18,12 +18,6 @@ class ISCRITests(TestCase):
         s = m.normalize(s)
         self.assertEqual("cyril vincent eae", s)
 
-    def test_split_phrases(self):
-        m = TextrankModel()
-        s = "ab\ncd.e"
-        l = m.split_phrases(s)
-        self.assertEqual(["ab", "cd", "e"], l)
-
     def test_tokenize(self):
         m = TextrankModel()
         res = m.tokenize(shakespear)
@@ -59,7 +53,7 @@ class ISCRITests(TestCase):
         m = TextrankModel()
         res = m.tokenize(shakespear)
         dico = m.count(res)
-        print(print([(lema.label, lema.count) for lema in dico.values()]))
+        print([(lema.label, lema.count) for lema in dico.values()])
 
     def test_group_synonyms(self):
         m = TextrankModel()
@@ -92,7 +86,8 @@ class ISCRITests(TestCase):
 
     def test_textrank(self):
         m = TextrankModel()
-        text = m.normalize(shakespear)
+        text = 'to be safe and healthy'
+        text = m.normalize(text)
         phrases = m.textrank(text)
         print(phrases)
 

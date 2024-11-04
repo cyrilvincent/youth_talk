@@ -8,3 +8,4 @@ Topic+Score = NbTopic+ * RatioTopic+ = NbTopic+²/(NbTopic- + 1)
 Topic-Score = NbTopic-²/(NbTopic+ + 1)
 Topic+LowNoise = NbTopic+/exp(NbTopic-)
 Topic-LowNoise = NbTopic-/exp(NbTopic+)
+Pour nltk gérer en + le sentiment

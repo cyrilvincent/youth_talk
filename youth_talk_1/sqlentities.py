@@ -67,6 +67,7 @@ class Topic(Base):
         self.source = source
         self.lemas = lemas
         self.date = datetime.datetime.now()
+        self.count = 0
 
     def __repr__(self):
         return f"{self.label} {self.count} {self.lemas}"
@@ -81,7 +82,7 @@ class FormTopic(Base):
     topic_id = Column(ForeignKey('topic.id'), nullable=False)
     topic: Mapped[Topic] = relationship(back_populates="form_topics")
     question_nb = Column(Integer, nullable=False)  #12 or 34
-    # count = Column(Integer, nullable=False) # Ne sert à rien
+    score = Column(Float)
     date = Column(DateTime, nullable=False)
 
     __table_args__ = (UniqueConstraint('form_id', 'topic_id', 'question_nb'),)
@@ -150,8 +151,6 @@ class Stat(Base):
     nltk_date = Column(DateTime)
     td_idf_date = Column(DateTime)
     openai_date = Column(DateTime)
-
-
     form: Mapped[Form] = relationship(back_populates="stat")
 
     def __repr__(self):

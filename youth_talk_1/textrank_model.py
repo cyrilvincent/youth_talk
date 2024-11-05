@@ -421,32 +421,39 @@ class TextrankService:
         form.stat.empathy_category = self.categorize(form.stat.empathy_score)
         print(form.stat.q1_2_nb_word, phrase1_2[:50], form.stat.q3_4_nb_word, phrase3_4[:50])
 
-    def make_q1_2_textrank(self, mode: str):
+    def make_questions_textrank(self, mode: str, question=12):  # question=12 or 34
         print(f"Textranking Q1 Q2 in mode {mode}")
         self.load_topics(mode)
         date_condition = Stat.textrank_date.is_(None)
         if mode == "nltk":
             date_condition = Stat.nltk_date.is_(None)
+        if question == 12:
+            q_condition = Stat.q1_2_nb_word > 0
+        else:
+            q_condition = Stat.q3_4_nb_word > 0
         forms: list[Form] = self.context.session.execute(
             select(Form).join(Stat).options(joinedload(Form.stat))
-            .where((Form.empathy_answers > 0) & date_condition & (Stat.q1_2_nb_word > 0))
+            .where((Form.empathy_answers > 0) & date_condition & q_condition)
         ).scalars().all()
         self.nb_total_form = len(forms)
         self.nb_form = 0
         print(f"Textranking {self.nb_total_form} forms")
         for form in forms[:]:
-            phrase1_2 = self.get_phrase1_2(form)
-            if mode == "textrank":
-                lemass = self.model.tokenize_textrank(phrase1_2)
+            if question == 12:
+                phrase = self.get_phrase1_2(form)
             else:
-                lemass = self.model.tokenize(phrase1_2)
+                phrase = self.get_phrase3_4(form)
+            if mode == "textrank":
+                lemass = self.model.tokenize_textrank(phrase)
+            else:
+                lemass = self.model.tokenize(phrase)
             dico = self.model.count(lemass)
             if mode == "nltk":
                 dico = self.model.sort_count_take(dico)
             topics = self.model.grouping(dico, mode)
-            print(self.nb_form, phrase1_2[:100], topics)
+            print(self.nb_form, phrase[:100], topics)
             for topic in topics:
-                form_topic = FormTopic(topic, self.q1_2)
+                form_topic = FormTopic(topic, question)
                 if form.form_topics is None:
                     form.form_topics = [form_topic]
                 else:

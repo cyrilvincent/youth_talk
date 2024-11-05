@@ -86,7 +86,7 @@ class ISCRITests(TestCase):
 
     def test_textrank(self):
         m = TextrankModel()
-        text = 'to be safe and healthy'
+        text = 'to be a successfull engineer. a better world.'
         text = m.normalize(text)
         phrases = m.textrank(text)
         print(phrases)
@@ -111,17 +111,47 @@ class ISCRITests(TestCase):
         m = TextrankModel()
         res = m.tokenize_textrank(shakespear)
         dico = m.count(res)
-        m.grouping(dico)
-        print(m.topics)
+        topics = m.grouping(dico, "textrank")
+        print(topics)
         # {'minds': minds 1 [minds 1], 'fixed': fixed 1 [fixed 1], 'mark': mark 1 [mark 1], 'mariage': mariage 4 [mariage 1, wedding 1, wedd 1, marriage 1], 'war': war 1 [war 1], 'impediments': impediments 1 [impediments 1]}
 
-    def test_doubling(self):
+    def test_multiple_group_textrank(self):
         m = TextrankModel()
         res = m.tokenize_textrank(shakespear)
         dico = m.count(res)
-        m.grouping(dico)
-        m.doubling()
-        print(m.topics)
+        topics = m.grouping(dico, "textrank")
+        print(topics)
+        res = m.tokenize_textrank("marriage war video")
+        dico = m.count(res)
+        topics = m.grouping(dico, "textrank")
+        print(topics)
+
+
+    # def test_doubling(self):
+    #     m = TextrankModel()
+    #     res = m.tokenize_textrank("to be a successfull engineer. a better world.")
+    #     dico = m.count(res)
+    #     topics = m.grouping(dico, "textrank")
+    #     m.doubling(topics)
+    #     print(m.topics)
+
+    def test_multi_doubling(self):
+        m = TextrankModel()
+        res = m.tokenize_textrank("a greater world")
+        dico = m.count(res)
+        topics = m.grouping(dico, "textrank")
+        # m.doubling(topics)
+        print(topics)
+        res = m.tokenize_textrank("world")
+        dico = m.count(res)
+        topics = m.grouping(dico, "textrank")
+        # m.doubling(topics)
+        print(topics)
+        res = m.tokenize_textrank("greater world")
+        dico = m.count(res)
+        topics = m.grouping(dico, "textrank")
+        # m.doubling(topics)
+        print(topics)
 
     def test_sentiment(self):
         m = TextrankModel()

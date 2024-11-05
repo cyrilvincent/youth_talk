@@ -59,11 +59,11 @@ class Topic(Base):
     form_topics: Mapped[list["FormTopic"]] = relationship(back_populates="topic")
     lemas: Mapped[list["Lema"]] = relationship(back_populates="topic")
     count = Column(Integer, nullable=False)
-    source = Column(String(5), nullable=False, index=True)
+    source = Column(String(10), nullable=False, index=True)
     date = Column(DateTime, nullable=False)
 
     def __init__(self, label=None, source=None, lemas=[]):
-        self.label = label
+        self.label = label[:50]
         self.source = source
         self.lemas = lemas
         self.date = datetime.datetime.now()
@@ -81,10 +81,16 @@ class FormTopic(Base):
     topic_id = Column(ForeignKey('topic.id'), nullable=False)
     topic: Mapped[Topic] = relationship(back_populates="form_topics")
     question_nb = Column(Integer, nullable=False)  #12 or 34
-    count = Column(Integer, nullable=False) # Ne sert à rien
+    # count = Column(Integer, nullable=False) # Ne sert à rien
     date = Column(DateTime, nullable=False)
 
     __table_args__ = (UniqueConstraint('form_id', 'topic_id', 'question_nb'),)
+
+    def __init__(self, topic: Topic, question_nb: int):
+        self.topic = topic
+        self.question_nb = question_nb
+        self.date = datetime.datetime.now()
+
 
     @property
     def key(self):
@@ -141,6 +147,7 @@ class Stat(Base):
     q3_4_sentiment = Column(Float)
     date = Column(DateTime, nullable=False)
     textrank_date = Column(DateTime)
+    nltk_date = Column(DateTime)
     td_idf_date = Column(DateTime)
     openai_date = Column(DateTime)
 

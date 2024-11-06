@@ -66,14 +66,18 @@ class JupyterService:
             category_inverse = 0
             category_term = "positive"
             category_inverse_term = "negative"
-        formula = "power(count(form_topic.id)::float,1)/sub_topic.nb_sub_form"
-        # if low_noise:
-        #     formula = "log(power(count(form_topic.id)::float,2)/power(2.7, sub_topic.nb_sub_form))"
-        sql = f"""select topic.id, topic.label as topic, count(form_topic.id) as nb_{category_term}_form, sub_topic.nb_sub_form as nb_{category_inverse_term}_form, {formula} as score from topic
+        formula = "count(form_topic.id)::float/coalesce(sub_topic.nb_sub_form+1, 0.1)"
+        aggregate = "count(form_topic.id)"
+        score_term = "nb"
+        if source == "tdidf":
+            aggregate = "sum(form_topic.score)"
+            score_term = "score"
+            formula = "sum(form_topic.score)::float/coalesce(sub_topic.nb_sub_form+1, 0.1)"
+        sql = f"""select topic.id, topic.label as topic, {aggregate} as {score_term}_{category_term}_form, sub_topic.nb_sub_form as {score_term}_{category_inverse_term}_form, {formula} as score from topic
         join form_topic on form_topic.topic_id=topic.id
         join form on form_topic.form_id=form.id
         join stat on stat.id=form.id
-        join (select topic.id, count(form_topic.id) as nb_sub_form from topic
+        left join (select topic.id, {aggregate} as nb_sub_form from topic
         	join form_topic on form_topic.topic_id=topic.id
         	join form on form_topic.form_id=form.id
         	join stat on stat.id=form.id
@@ -81,14 +85,14 @@ class JupyterService:
         	and stat.{empathy_category}_category={category_inverse}
             and form_topic.question_nb={question_nb}
         	group by topic.id
-        	having count(form_topic.id) > {denominator_thresold} and count(form_topic.id) < {exp_max}
+        	having {aggregate} > {denominator_thresold} and {aggregate} < {exp_max}
         ) sub_topic on sub_topic.id = topic.id
         where source='{source}'
         and stat.{empathy_category}_category={category}
         and form_topic.question_nb={question_nb}
         group by topic.id, sub_topic.nb_sub_form
-        having count(form_topic.id) > {numerator_thresold}
-        order by score desc"""
+        having {aggregate} > {numerator_thresold}
+        order by score desc,  {score_term}_{category_term}_form desc"""
         if debug:
             print(sql)
         df = self.get_by_sql(sql)

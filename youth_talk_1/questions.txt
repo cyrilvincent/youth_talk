@@ -1,2 +1,5 @@
 Avoir des textes long : encourage avec un widget comme pour les mot de passe longs
 Réutiliser le kmeans pour en faire un modèle
+Tarif EC2 Petit serveur
+Encapsuler jupyter_service
+Jupyter Dash

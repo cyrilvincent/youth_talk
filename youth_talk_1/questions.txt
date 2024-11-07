@@ -1,5 +1,5 @@
 Avoir des textes long : encourage avec un widget comme pour les mot de passe longs
-Réutiliser le kmeans pour en faire un modèle
 Tarif EC2 Petit serveur
-Encapsuler jupyter_service
 Jupyter Dash
+ChatGPT : faire les synonymes puis vérifier qu'ils sont des les lemas
+Pour chaque topics leander, concatener tous les textes liés et demander à GTP d'expliquer le topic par rapport à la catégorie d'empathie

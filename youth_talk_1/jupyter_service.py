@@ -39,11 +39,25 @@ class JupyterService:
         return df
 
     def get_lemas(self, topic: str, source: str):
+        if source == "tdidf":
+            source = "textrank"
         sql = f"""select topic.label as topic_label, lema.label as lema_label, lema.count from topic
         join lema on lema.topic_id=topic.id
         where topic.label = '{topic}'
         and source='{source}'
         order by lema.count desc"""
+        df = self.get_by_sql(sql)
+        if len(df) == 0:
+            df = self.get_lemas_2(topic, source)
+        return df
+
+    def get_lemas_2(self, lema: str, source: str):
+        sql = f"""select topic.label as topic_label, lema2.label as lema_label, lema2.count from lema
+        join topic on lema.topic_id=topic.id
+        join lema as lema2 on lema2.topic_id=topic.id
+        where lema.label = '{lema}'
+        and source='{source}'
+        order by lema2.count desc"""
         df = self.get_by_sql(sql)
         return df
 
@@ -56,7 +70,7 @@ class JupyterService:
         plt.imshow(wordcloud, interpolation='bilinear')
         plt.axis("off")
 
-    def get_scores(self, source: str, question_nb: int, empathy_category: str, positive: bool, denominator_thresold: float, numerator_thresold: float, debug=False, exp_max=10e9):
+    def get_scores(self, source: str, question_nb: int, empathy_category: str, positive: bool, denominator_thresold: float, numerator_thresold: float, debug=False, exp_max=10e9, sentiment=False):
         category = 0
         category_inverse = 2
         category_term = "negative"
@@ -66,13 +80,18 @@ class JupyterService:
             category_inverse = 0
             category_term = "positive"
             category_inverse_term = "negative"
-        formula = "count(form_topic.id)::float/coalesce(sub_topic.nb_sub_form+1, 0.1)"
+        formula = "count(form_topic.id)::float/coalesce(sub_topic.nb_sub_form, 0.1)"
         aggregate = "count(form_topic.id)"
         score_term = "nb"
         if source == "tdidf":
             aggregate = "sum(form_topic.score)"
             score_term = "score"
-            formula = "sum(form_topic.score)::float/coalesce(sub_topic.nb_sub_form+1, 0.1)"
+            formula = "sum(form_topic.score)::float/coalesce(sub_topic.nb_sub_form, 0.1)"
+        q_sql = "q" + str(question_nb)[0] + "_" + str(question_nb)[1]
+        sentiment_positive = f"and stat.{q_sql}_sentiment < -0.33 "
+        sentiment_negative = f"and stat.{q_sql}_sentiment > 0.33 "
+        if positive:
+            sentiment_negative, sentiment_positive = sentiment_positive, sentiment_negative
         sql = f"""select topic.id, topic.label as topic, {aggregate} as {score_term}_{category_term}_form, sub_topic.nb_sub_form as {score_term}_{category_inverse_term}_form, {formula} as score from topic
         join form_topic on form_topic.topic_id=topic.id
         join form on form_topic.form_id=form.id
@@ -83,6 +102,7 @@ class JupyterService:
         	join stat on stat.id=form.id
         	where source='{source}'
         	and stat.{empathy_category}_category={category_inverse}
+        	{sentiment_negative if sentiment else ""}
             and form_topic.question_nb={question_nb}
         	group by topic.id
         	having {aggregate} > {denominator_thresold} and {aggregate} < {exp_max}
@@ -90,6 +110,7 @@ class JupyterService:
         where source='{source}'
         and stat.{empathy_category}_category={category}
         and form_topic.question_nb={question_nb}
+        {sentiment_positive if sentiment else ""}
         group by topic.id, sub_topic.nb_sub_form
         having {aggregate} > {numerator_thresold}
         order by score desc,  {score_term}_{category_term}_form desc"""

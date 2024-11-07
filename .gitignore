@@ -4,6 +4,7 @@ Cultural-Analytics
 **/chromedriver_win32/**
 *.zip
 *.export.CSV
+*.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

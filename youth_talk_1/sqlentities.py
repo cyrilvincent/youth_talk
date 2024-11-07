@@ -7,6 +7,7 @@ from dbcontext import Base
 
 # form 1-* form_topic  *-1 topic -* lema
 #       -1 stat
+#       -* llm
 
 
 class Form(Base):
@@ -46,6 +47,7 @@ class Form(Base):
     date_added = Column(DateTime, nullable=False)
     date_computed = Column(DateTime)
     stat: Mapped["Stat"] = relationship(back_populates="form", uselist=False)
+    llms: Mapped[list["LLM"]] = relationship(back_populates="form")
 
     def __repr__(self):
         return f"{self.id}"
@@ -59,7 +61,7 @@ class Topic(Base):
     form_topics: Mapped[list["FormTopic"]] = relationship(back_populates="topic")
     lemas: Mapped[list["Lema"]] = relationship(back_populates="topic")
     count = Column(Integer, nullable=False)
-    source = Column(String(10), nullable=False, index=True)
+    source = Column(String(20), nullable=False, index=True)
     date = Column(DateTime, nullable=False)
 
     def __init__(self, label=None, source=None, lemas=[]):
@@ -92,7 +94,6 @@ class FormTopic(Base):
         self.question_nb = question_nb
         self.date = datetime.datetime.now()
 
-
     @property
     def key(self):
         return self.form_id, self.topic_id
@@ -116,7 +117,6 @@ class Lema(Base):
         self.previous: str | None = previous
         self.count = 0
         self.date = datetime.datetime.now()
-        self.local_count = 0
 
     def __repr__(self):
         return f"{self.label} {self.count}"
@@ -147,7 +147,7 @@ class Stat(Base):
     q3_4_nb_word = Column(Integer)
     q3_4_sentiment = Column(Float)
     date = Column(DateTime, nullable=False)
-    textrank_date = Column(DateTime)
+    textrank_date = Column(DateTime) # A dupliquer pour les q34
     nltk_date = Column(DateTime)
     td_idf_date = Column(DateTime)
     openai_date = Column(DateTime)
@@ -155,5 +155,28 @@ class Stat(Base):
 
     def __repr__(self):
         return f"{self.id} {self.q1_2_nb_word} {self.q1_2_sentiment}"
+
+
+class LLM(Base):
+    __tablename__ = "llm"
+
+    id = Column(BigInteger, primary_key=True)
+    text = Column(String(255), nullable=False)
+    source = Column(String(20), nullable=False)
+    form_id = Column(ForeignKey('form.id'), nullable=False)
+    form: Mapped[Form] = relationship(back_populates="llms")
+    question_nb = Column(Integer, nullable=False)
+    date = Column(DateTime, nullable=False)
+
+    __table_args__ = (UniqueConstraint('form_id', 'source', 'question_nb'),)
+
+    def __init__(self, text=None, source=None, question=None):
+        self.text = text
+        self.source = source
+        self.question_nb = question
+        self.date = datetime.datetime.now()
+
+    def __repr__(self):
+        return f"{self.text}"
 
 

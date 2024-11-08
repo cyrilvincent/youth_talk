@@ -1,0 +1,11 @@
+id,main_topic,score,topic0_id,topic1_id,topic1,topic2_id,topic2,explaination
+18,poverty,0.95,34145,30772,poverty,0,,"Personal distress often involves anxiety, depression, hopelessness, while poverty entails deprivation, instability, and social exclusion."
+63,climate change,0.95,34190,30795,climate,0,,"Personal distress from climate change includes anxiety, grief, helplessness, hopelessness, burnout, and eco-anxiety, affecting mental well-being."
+88,environmental deterioration,0.9,34215,30988,environmental,0,,"Personal distress includes anxiety, depression, and trauma; environmental deterioration encompasses pollution, habitat loss, and climate change impacts."
+91,political conflict,0.9,34218,0,,30711,conflict,"Personal distress can involve anxiety, depression, and turmoil, while political conflict often leads to division, violence, and social instability."
+15,discrimination,0.85,34142,30869,discrimination,0,,"Personal distress refers to emotional suffering, while discrimination involves unfair treatment based on identity, leading to social exclusion."
+89,social injustice,0.85,34216,31170,social,32271,injustice,"Personal distress refers to individual suffering, while social injustice denotes systemic inequalities and unfair treatment in society."
+92,unstable world conditions,0.8,34219,0,,30740,world,"Personal distress includes anxiety, depression, and trauma; unstable world conditions involve conflict, crises, uncertainty, and social unrest."
+66,lack of opportunity,0.8,34193,33290,lack,0,,"Personal distress and lack of opportunity lead to feelings of hopelessness, frustration, isolation, and diminished self-worth."
+87,financial insecurity,0.8,34214,30907,financial,30865,insecurity,"Personal distress includes anxiety and depression; financial insecurity involves instability, debt, and inability to meet basic needs."
+90,mental health issues,0.75,34217,31342,mental,30784,health,"Negative terms include stigma, isolation, shame, burnout, anxiety, depression, and crisis, impacting wellbeing and social support."

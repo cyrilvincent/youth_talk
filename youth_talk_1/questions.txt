@@ -1,4 +1,8 @@
-Avoir des textes long : encourage avec un widget comme pour les mot de passe longs
-Tarif EC2 Petit serveur
-Jupyter Dash
-Pour chaque topics leader, concatener tous les textes liés et demander à GTP d'expliquer le topic par rapport à la catégorie d'empathie
+chatgpt = low level
+chatgpt-highlevel = high noise
+textrank sert pour les synonymes
+td_idf ne sert un peu pour les low noise : à abandonner
+nltk : ne sert à rien
+Pour les low noises de temps en temps il faut filtrer par sentiement (vader)
+Mettre dans la doc NLTK Gestalt Vader td_idf (même si on ne s'en sert pas) et la méthodo : broder
+Tout expliquer en anglais

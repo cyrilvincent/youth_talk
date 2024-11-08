@@ -1,6 +1,6 @@
 import os
 name = "Youth Talk 1"
-version = "0.1.0.Alpha"
+version = "0.1.0.Beta"
 copyright = "(c) Skema 2024"
 connection_string = "postgresql://postgres:sa@localhost:5432/yt1"
 path = "data"

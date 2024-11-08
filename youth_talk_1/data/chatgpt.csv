@@ -1,0 +1,94 @@
+index,id,ec2,ec0,pt2,pt0,f2,f0,pd2,pd0,question_nb
+Collective Intelligence for Society,0,90.0,,,,,,,,12
+Providing Safe Spaces for All,1,85.0,,,,,,,,12
+Global Peace and Tolerance,2,95.0,,,,,,,,12
+Environmental Sustainability,3,90.0,,,,,,,,12
+Reducing Inequalities,4,88.0,,,,,,,,12
+Empathy and Kindness in Society,5,92.0,,,,,,,,12
+Access to Basic Needs for All,6,94.0,,,,,,,,12
+Education for All,7,91.0,,,,,,,,12
+Support for the Needy,8,93.0,,,,,,,,12
+Fraternity and Solidarity,9,89.0,,,,,,,,12
+Health and Well-being,10,90.0,,,,,,,,12
+Promoting Human Rights,11,87.0,,,,,,,,12
+Cultural Acceptance and Understanding,12,95.0,,,,,,,,12
+Community Service and Involvement,13,90.0,,,,,,,,12
+depression,14,,80.0,,,,,,,12
+discrimination,15,,75.0,,,,,,85.0,12
+war,16,,90.0,,,,95.0,,,12
+global warming,17,,85.0,,,,,,,12
+poverty,18,,80.0,,,,80.0,,95.0,12
+inequality,19,,85.0,,65.0,,90.0,,,12
+corruption,20,,70.0,,,,90.0,,,12
+racism,21,,75.0,,,,88.0,,,12
+violence,22,,80.0,,,,91.0,,,12
+lack of empathy,23,,65.0,,,,,,,12
+Community Involvement,24,,,85.0,,,,,,12
+Empathy and Understanding,25,,,90.0,,,,,,12
+Sustainable Development,26,,,95.0,,,,,,12
+Equality and Equity,27,,,88.0,,,,,,12
+Inner Peace and Happiness,28,,,92.0,,,,,,12
+Support for Others,29,,,87.0,,,,,,12
+Environmental Protection,30,,,93.0,,,,,,12
+Climate Change Awareness,31,,,90.0,,,,,,12
+Social Cohesion,32,,,86.0,,,,,,12
+Positive Leadership,33,,,89.0,,,,,,12
+Personal Growth and Development,34,,,91.0,,,,,,12
+Mental Health Awareness,35,,,88.0,,,,,,12
+Cultural Exchange,36,,,83.0,,,,,,12
+Role Modeling,37,,,85.0,,,,,,12
+Promoting Understanding across Differences,38,,,90.0,,,,,,12
+environmental_destruction,39,,,,85.0,,,,,12
+narrow_mindedness,40,,,,70.0,,,,,12
+prejudice_and_discrimination,41,,,,75.0,,,,,12
+short_termism,42,,,,80.0,,,,,12
+economic_instability,43,,,,90.0,,,,,12
+lack_of_understanding,44,,,,60.0,,,,,12
+suffering,45,,,,95.0,,,,,12
+global_conflict,46,,,,85.0,,,,,12
+mental_health_struggles,47,,,,72.0,,,,,12
+personal_growth,48,,,,,95.0,,90.0,,12
+happiness,49,,,,,100.0,,95.0,,12
+peace,50,,,,,100.0,,,,12
+family,51,,,,,90.0,,,,12
+sustainability,52,,,,,85.0,,,,12
+equality,53,,,,,90.0,,90.0,,12
+travel,54,,,,,80.0,,,,12
+adventure,55,,,,,75.0,,,,12
+health,56,,,,,95.0,,,,12
+cultural_appreciation,57,,,,,70.0,,85.0,,12
+volunteering,58,,,,,80.0,,,,12
+community_support,59,,,,,85.0,,,,12
+educational_aspirations,60,,,,,90.0,,,,12
+career_success,61,,,,,90.0,,,,12
+financial_stability,62,,,,,85.0,,90.0,,12
+climate_change,63,,,,,,85.0,,95.0,12
+sexism,64,,,,,,85.0,,,12
+environmental_degradation,65,,,,,,87.0,,,12
+lack_of_opportunity,66,,,,,,82.0,,80.0,12
+individualism,67,,,,,,78.0,,,12
+social_unity,68,,,,,,80.0,,,12
+economic_stability,69,,,,,,86.0,,,12
+political_instability,70,,,,,,83.0,,,12
+balanced_life,71,,,,,,,90.0,,12
+satisfaction_with_choices,72,,,,,,,85.0,,12
+sustainable_future,73,,,,,,,95.0,,12
+peace_and_harmony,74,,,,,,,100.0,,12
+successful_career,75,,,,,,,90.0,,12
+health_and_safety,76,,,,,,,95.0,,12
+community_service,77,,,,,,,90.0,,12
+education_access,78,,,,,,,85.0,,12
+climate_action,79,,,,,,,95.0,,12
+humanitarian_support,80,,,,,,,90.0,,12
+collective_security,81,,,,,,,95.0,,12
+global_cooperation,82,,,,,,,90.0,,12
+professional_success,83,,,,,,,90.0,,12
+mindful_consumption,84,,,,,,,90.0,,12
+emotional_wellbeing,85,,,,,,,90.0,,12
+innovation_and_progress,86,,,,,,,90.0,,12
+financial_insecurity,87,,,,,,,,80.0,12
+environmental_deterioration,88,,,,,,,,90.0,12
+social_injustice,89,,,,,,,,85.0,12
+mental_health_issues,90,,,,,,,,75.0,12
+political_conflict,91,,,,,,,,90.0,12
+unstable_world_conditions,92,,,,,,,,80.0,12

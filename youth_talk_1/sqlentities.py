@@ -63,6 +63,7 @@ class Topic(Base):
     count = Column(Integer, nullable=False)
     source = Column(String(20), nullable=False, index=True)
     date = Column(DateTime, nullable=False)
+    gpt_comments: Mapped[list["GPTComment"]] = relationship(back_populates="topic")
 
     def __init__(self, label=None, source=None, lemas=[]):
         self.label = label[:50]
@@ -96,7 +97,7 @@ class FormTopic(Base):
 
     @property
     def key(self):
-        return self.form_id, self.topic_id
+        return self.form_id, self.topic_id, self.question_nb
 
     def __repr__(self):
         return f"{self.id} {self.form_id} {self.topic_id}"
@@ -178,5 +179,55 @@ class LLM(Base):
 
     def __repr__(self):
         return f"{self.text}"
+
+
+class GPTComment(Base):
+    __tablename__ = "gpt_comment"
+
+    id = Column(BigInteger, primary_key=True)
+    question_nb = Column(Integer, nullable=False)
+    empathy = Column(String(2), nullable=False)
+    positive = Column(Boolean, nullable=False)
+    topic_id = Column(ForeignKey('topic.id'), nullable=False)
+    topic: Mapped[Topic] = relationship(back_populates="gpt_comments")
+    source = Column(String(20), nullable=False)
+    comment = Column(String(), nullable=False)
+    date = Column(DateTime, nullable=False)
+
+    __table_args__ = (UniqueConstraint('question_nb', 'empathy', 'positive', 'topic_id'),)
+
+    def __init__(self, topic: Topic, question: int, empathy: str, positive: bool, comment: str, source: str):
+        self.topic = topic
+        self.question_nb = question
+        self.empathy = empathy
+        self.positive = positive
+        self.comment = comment
+        self.source = source
+        self.date = datetime.datetime.now()
+
+    @property
+    def key(self):
+        return self.question_nb, self.empathy, self.positive, self.topic_id
+
+    def __repr__(self):
+        return f"{self.empathy} {self.positive} {self.comment}"
+
+class GPTHighLevel(Base):
+    __tablename__ = "chatgpt_highlevel"
+
+    id = Column(BigInteger, primary_key=True)
+    index = Column(String)
+    ec2 = Column(String)
+    ec0 = Column(String)
+    pt2 = Column(String)
+    pt0 = Column(String)
+    f2 = Column(String)
+    f0 = Column(String)
+    pd2 = Column(String)
+    pd0 = Column(String)
+    question_nb = Column(SmallInteger)
+
+    def __repr__(self):
+        return f"{self.index}"
 
 

@@ -5,7 +5,8 @@ from openai import OpenAI # pip install openai
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from dbcontext import Context
-from sqlentities import Stat, Form, LLM, Topic, FormTopic, Lema
+from jupyter_service import JupyterService
+from sqlentities import Stat, Form, LLM, Topic, FormTopic, Lema, GPTComment, GPTHighLevel
 from textrank_model import TextrankService
 
 
@@ -17,6 +18,13 @@ class ChatGPTModel:
             key = f.read()
         self.client = OpenAI(api_key=key)
         self.chat_model = chat_model
+        self.dico: dict[str, str] = {
+            "ec": "empathic concern",
+            "pt": "perspective taking",
+            "f": "fantasy",
+            "pd": "personal distress",
+        }
+        self.limit = 128000
 
     def topic(self, text: str, nb=3) -> str:
         topic = f"What are the {nb} main topics, one simple word each, of the following message, in CSV format, in english?"
@@ -26,6 +34,31 @@ class ChatGPTModel:
                       {"role": "user", "content": text}])
         return completion.choices[0].message.content
 
+    def empathy(self, text: str, topic: str, category: str, positive: bool):
+        text = text[:self.limit]
+        positive_text = "positive" if positive else "negative"
+        question = f"Explain to me the {positive_text} terms related to {self.dico[category]} and {topic} in less than 20 words"
+        completion = self.client.chat.completions.create(
+            model=self.chat_model,
+            messages=[{"role": "system", "content": question},
+                      {"role": "user", "content": text}])
+        res = completion.choices[0].message.content
+        text = text.replace("\n", ". ")[:50]
+        print(f"{question} {text} => {res}")
+        return res
+
+    def high_level_topics(self, text: str, category: str, positive: bool):
+        text = text[:self.limit]
+        positive_text = "positive" if positive else "negative"
+        question = f"What are the {positive_text} topics related to {self.dico[category]} in the following text? Ponderate each topic by a score from 0 to 100 in json format"
+        completion = self.client.chat.completions.create(
+            model=self.chat_model,
+            messages=[{"role": "system", "content": question},
+                      {"role": "user", "content": text}])
+        res = completion.choices[0].message.content
+        print(f"{question} length: {len(text)} => {res}")
+        return res
+
 
 class LLMService(TextrankService):
 
@@ -33,7 +66,8 @@ class LLMService(TextrankService):
         super().__init__(context)
         self.gpt_model = ChatGPTModel()
         self.topics: dict[str, Topic] = {}
-        self.lemas: set[str] = set()
+        self.lemas: dict[str, Lema] = {}
+        self.gpt_comments: dict[str, GPTComment] = {}
 
     def gpt(self, question):
         if question == 12:
@@ -123,7 +157,7 @@ class LLMService(TextrankService):
         lemas: list[Lema] = self.context.session.execute(select(Lema)).scalars().all()
         for lema in lemas:
             if lema.label not in self.lemas:
-                self.lemas.add(lema.label)
+                self.lemas[lema.label] = lema
         print(f"Found {len(self.lemas)} unique lemas")
         print("Querying Topics")
         topics: list[Topic] = self.context.session.execute(
@@ -135,18 +169,148 @@ class LLMService(TextrankService):
         nb_lema = 0
         for topic in topics:
             nb_topic += 1
-            if len(topic.lemas) == 0:
-                topic.lemas = [Lema(topic.label)]
             synonyms = self.model.get_synonyms(topic.label)
+            if topic.label not in synonyms:
+                synonyms.insert(0, topic.label)
             for synonym in synonyms[:10]:
                 if synonym in self.lemas:
                     lema = Lema(synonym)
+                    lema.count = self.lemas[synonym].count
                     if lema not in topic.lemas:
                         topic.lemas.append(lema)
                         nb_lema += 1
                         print(f"{nb_topic}/{nb_total_topic} => Lema {nb_lema} {synonym}")
-            print("Comitting")
+        print("Comitting")
         self.context.session.commit()
+
+    def get_topic(self, topic_id: int) -> Topic:
+        topic = self.context.session.execute(
+            select(Topic).options(joinedload(Topic.lemas)).options(joinedload(Topic.form_topics))
+            .where(Topic.id == topic_id)).unique().scalars().first()
+        return topic
+
+    def get_forms_by_topic_id(self, topic_id):
+        topic = self.context.session.execute(
+            select(Topic).options(joinedload(Topic.form_topics).joinedload(FormTopic.form))
+            .where(Topic.id == topic_id)).unique().scalars().first()
+        forms = [form_topic.form for form_topic in topic.form_topics]
+        return forms
+
+    def merge_topics(self, from_id: int, to_id: int):
+        topic_from = self.get_topic(from_id)
+        topic_to = self.get_topic(to_id)
+        print(f"Merging {topic_from.label} => {topic_to.label}")
+        for lema in list(topic_from.lemas):
+            if lema not in topic_to.lemas:
+                topic_to.lemas.append(lema)
+        topic_from.lemas.clear()
+        for form_topic in list(topic_from.form_topics):
+            res = [(form_topic.form_id, form_topic.question_nb) for form_topic in topic_to.form_topics]
+            if (form_topic.form_id, form_topic.question_nb) not in res:
+                topic_to.form_topics.append(form_topic)
+                form_topic.topic = topic_to
+            else:
+                self.context.session.delete(form_topic)
+        topic_from.form_topics.clear()
+        topic_to.count += topic_from.count
+        print("Comitting")
+        self.context.session.delete(topic_from)
+        self.context.session.commit()
+
+    def topic_empathies(self, question: int):
+        gpt_comments = self.context.session.execute(select(GPTComment)).scalars().all()
+        for gpt_comment in gpt_comments:
+            self.gpt_comments[gpt_comment.key] = gpt_comment
+        jupyter = JupyterService(self.context)
+        for key in self.gpt_model.dico.keys():
+            for positive in [True, False]:
+                df = jupyter.get_scores(self.gpt_model.chat_model, question, key, positive, 5, 0)
+                for index, row in df.iterrows():
+                    topic_id = row["id"]
+                    if (question, key, positive, topic_id) not in self.gpt_comments:
+                        topic = self.get_topic(topic_id)
+                        self.topic_empathies_categories(question, key, positive, topic)
+
+    def topic_highlevel_empathies(self, question: int):
+        gpt_comments = self.context.session.execute(select(GPTComment)).scalars().all()
+        for gpt_comment in gpt_comments:
+            self.gpt_comments[gpt_comment.key] = gpt_comment
+        for key in self.gpt_model.dico.keys():
+            for positive in [True, False]:
+                topics: list[Topic] = self.context.session.execute(
+                    select(Topic).where(Topic.source == "highlevel")).scalars().all()
+                for topic in topics:
+                    if (question, key, positive, topic.id) not in self.gpt_comments:
+                        topic = self.get_topic(topic.id)
+                        self.topic_empathies_categories(question, key, positive, topic)
+
+    def topic_empathies_categories(self, question: int, empathy: str, positive: bool, topic: Topic):
+        forms = self.get_forms_by_topic_id(topic.id)
+        text = ""
+        for form in forms:
+            if question == 12:
+                phrase = self.get_phrase1_2(form)
+            else:
+                phrase = self.get_phrase3_4(form)
+            text += phrase + "\n"
+        res = self.gpt_model.empathy(text, topic.label, empathy, positive)
+        gpt_comment = GPTComment(topic, question, empathy, positive, res, self.gpt_model.chat_model)
+        self.context.session.add(gpt_comment)
+        self.context.session.commit()
+
+    def create_highlevel_topics(self, question: int):
+        dico: dict[tuple[str, bool], list[Form]] = {}
+        for key in self.gpt_model.dico.keys():
+            for positive in [True, False]:
+                dico[key, positive] = []
+        forms: list[Form] = self.context.session.execute(
+            select(Form).options(joinedload(Form.stat)).join(Stat).where(Form.stat != None)).scalars().all()
+        for form in forms:
+            if form.stat.pd_category == 0:
+                dico["pd", False].append(form)
+            elif form.stat.pd_category == 2:
+                dico["pd", True].append(form)
+            elif form.stat.ec_category == 0:
+                dico["ec", False].append(form)
+            elif form.stat.ec_category == 2:
+                dico["ec", True].append(form)
+            elif form.stat.pt_category == 0:
+                dico["pt", False].append(form)
+            elif form.stat.pt_category == 2:
+                dico["pt", True].append(form)
+            elif form.stat.f_category == 0:
+                dico["f", False].append(form)
+            elif form.stat.f_category == 2:
+                dico["f", True].append(form)
+        for key in self.gpt_model.dico.keys():
+            for positive in [True, False]:
+                forms = dico[key, positive]
+                text = ""
+                for form in forms:
+                    if question == 12:
+                        phrase = self.get_phrase1_2(form)
+                    else:
+                        phrase = self.get_phrase3_4(form)
+                    text += phrase + "\n"
+                print(key, positive)
+                self.gpt_model.high_level_topics(text, key, positive)
+
+    def create_highlevel_linked_topic(self, question: int):
+        dico: dict[str, GPTHighLevel] = {}
+        highlevels: list[GPTHighLevel] = self.context.session.execute(
+            select(GPTHighLevel).where(GPTHighLevel.question_nb == question)).scalars().all()
+        for highlevel in highlevels:
+            if highlevel.index not in dico:
+                dico[highlevel.index] = highlevel
+                topic = Topic(highlevel.index, "highlevel")
+                self.context.session.add(topic)
+        self.context.session.commit()
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
@@ -170,7 +334,12 @@ if __name__ == '__main__':
     s = LLMService(context)
     # s.gpt(12)
     # s.create_topics(12)
-    s.create_synonyms()
+    # s.create_synonyms()
+    # s.topic_empathies(12)
+    # s.create_highlevel_topics(12)
+    # s.create_highlevel_linked_topic(12)
+    s.topic_highlevel_empathies(12)
+    # s.merge_topics(30897, 30795)
     print(f"Nb form: {s.nb_form}")
     print(f"Nb topics: {len(s.topics)}")
     new_db_size = context.db_size()

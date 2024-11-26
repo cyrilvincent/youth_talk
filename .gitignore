@@ -5,6 +5,7 @@ Cultural-Analytics
 *.zip
 *.export.CSV
 *.env
+**/out/**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
